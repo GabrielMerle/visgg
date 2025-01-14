@@ -7,6 +7,7 @@ from streamlit_folium import st_folium
 import sqlite3
 from states_json_util import find_state
 import plotly.express as px
+import plotly.graph_objects as go
 
 # Set Streamlit page config (layout="wide" helps the map fill more space)
 st.set_page_config(layout="wide", page_title="Dynamic Railroad Incident Map")
@@ -14,7 +15,8 @@ st.set_page_config(layout="wide", page_title="Dynamic Railroad Incident Map")
 ################################################################################
 # Minimal CSS injection for a dark background in main area & sidebar.
 ################################################################################
-st.markdown("""
+st.markdown(
+    """
     <style>
     /* Make the main background dark */
     .main {
@@ -34,7 +36,9 @@ st.markdown("""
         color: #FFFFFF;
     }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
 # Initialize theme toggle
 if "theme" not in st.session_state:
@@ -43,7 +47,7 @@ if "theme" not in st.session_state:
 def toggle_theme():
     st.session_state["theme"] = (
         "light" 
-        if (st.session_state["theme"] == "dark" or st.session_state["theme"] == "states") 
+        if (st.session_state["theme"] == "dark" or st.session_state["theme"] == "states")
         else "dark"
     )
 
@@ -59,7 +63,7 @@ map_tiles = {
 }.get(st.session_state["theme"], "CartoDB dark_matter")
 
 # Path to SQLite database
-sqlite_db = r"C:\\Users\\yongj\\OneDrive\\Desktop\\Visualization Project\\railroad_incidents_cleanedMUT.db"
+sqlite_db = r"C:\Users\Gabri\Documents\Data science Bachelors\Year 2\Q2\VIS\Project\Geotry_1.0\railroad_incidents_cleanedMUT.db"
 
 def get_filter_options(table_name, column_name):
     conn = sqlite3.connect(sqlite_db)
@@ -78,7 +82,10 @@ damage_categories = get_filter_options("Equipment_Damage_Categories", "Damage_Ca
 
 # Sidebar dropdown for selecting visualization mode
 st.sidebar.title("Visualization Mode")
-visualization_mode = st.sidebar.selectbox("Select Visualization", ["Dynamic Bar Chart", "Radar Plot", "Line Chart"])
+visualization_mode = st.sidebar.selectbox(
+    "Select Visualization",
+    ["Dynamic Bar Chart", "Radar Plot", "Line Chart"]
+)
 
 # Sidebar dropdown for selecting mode
 mode = st.sidebar.selectbox("Select Mode", ["Incident Details", "State Details"])
@@ -89,7 +96,7 @@ if mode == "State Details":
     summary_container = st.sidebar.container()
 else:
     st.sidebar.title("Incident Details")
-    summary_container = st.sidebar.container()  # Container created for Incident Details
+    summary_container = st.sidebar.container()
 
 ################################################################################
 # Two-column layout for filters in the sidebar.
@@ -170,22 +177,19 @@ numeric_columns = ['trnspd', 'eqpdmg', 'trkdmg', 'caskld', 'casinj']
 for col in numeric_columns:
     filtered_data[col] = pd.to_numeric(filtered_data[col], errors='coerce')
 
-# Assign colors to accident types (improved palette)
+# Assign colors to accident types (using Plotly's qualitative palette)
 unique_accident_types = filtered_data["Accident_Type"].unique()
-color_palette = px.colors.qualitative.Plotly  # Using Plotly's qualitative palette
+color_palette = px.colors.qualitative.Plotly
 accident_colors = {
     accident_type: color_palette[i % len(color_palette)]
     for i, accident_type in enumerate(unique_accident_types)
 }
 
-# Sidebar for displaying selected marker details
-# incident_details_placeholder = st.sidebar.empty()  # Removed
-
 # Create the map
 m = folium.Map(location=[37.0902, -95.7129], zoom_start=5, tiles=map_tiles)
 
 if mode == "State Details":
-    # State Mode: Add state markers
+    # State Mode: Add state markers (example placeholders)
     state_markers = [
         {"lat": 34.0489, "lon": -111.0937, "state": "Arizona"},
         {"lat": 40.7128, "lon": -74.0060, "state": "New York"},
@@ -212,20 +216,10 @@ else:
         if pd.isnull(row["latitude"]) or pd.isnull(row["longitud"]):
             continue
 
-        # **Remove popup from markers**
-        # Previously, popups were added here. Now, we omit them.
-        # popup_content = f"""
-        # <b>Accident Type:</b> {accident_type}<br>
-        # <b>Injuries:</b> {row['casinj']}<br>
-        # <b>Deaths:</b> {row['caskld']}<br>
-        # <b>Description:</b> {description}
-        # """
-
         marker = folium.Marker(
             location=[row["latitude"], row["longitud"]],
             icon=folium.Icon(color=color),
             tooltip="Click for details"
-            # popup=folium.Popup(popup_content, max_width=300)  # Removed
         )
 
         if enable_clustering:
@@ -271,7 +265,7 @@ with summary_container:
             st.write(f"### Clicked State Coordinates: ({lat}, {lon})")
             st.write(f"### Clicked State: {clickedState}")
 
-            wantedState = str(clickedState) 
+            wantedState = str(clickedState)
             state_data = filtered_data[filtered_data['state_name'] == wantedState]
 
             if state_data.empty:
@@ -331,14 +325,17 @@ with summary_container:
             st.warning("No incident data found for the clicked location.")
 
 ###############################################################################
-# Dynamic Bar Chart Visualization
+# Dynamic Visualizations
 ###############################################################################
 if visualization_mode == "Dynamic Bar Chart":
     st.markdown("### Dynamic Railroad Incidents Bar Chart")
     
     # Determine if a state is selected
     if mode == "State Details" and clicked_data and clicked_data.get("last_clicked"):
-        wantedState = str(find_state(lat, lon))
+        wantedState = str(find_state(
+            clicked_data["last_clicked"]["lat"],
+            clicked_data["last_clicked"]["lng"]
+        ))
         chart_data = filtered_data[filtered_data['state_name'] == wantedState]
     else:
         chart_data = filtered_data.copy()
@@ -347,10 +344,7 @@ if visualization_mode == "Dynamic Bar Chart":
         st.warning("No data available for the selected filters.")
     else:
         # Dropdowns for x-axis and y-axis
-        x_axis_options = {
-            "Train Speed (mph)": "trnspd",
-        }
-        
+        x_axis_options = {"Train Speed (mph)": "trnspd"}
         y_axis_options = {
             "Equipment Damage ($)": "eqpdmg",
             "Track Damage ($)": "trkdmg",
@@ -358,7 +352,6 @@ if visualization_mode == "Dynamic Bar Chart":
             "Total Injured": "casinj"
         }
         
-        # Using Streamlit's container for layout
         bar_chart_container = st.container()
         
         with bar_chart_container:
@@ -371,17 +364,14 @@ if visualization_mode == "Dynamic Bar Chart":
             # Option for stacked bar chart by weather condition
             stack_by_weather = st.checkbox("Stack by Weather Condition", key="stack_weather")
             
-            # Filtered data for selected columns
             selected_columns = [x_axis_options[x_axis], y_axis_options[y_axis], "Weather_Condition"]
             bar_filtered_data = chart_data[selected_columns].dropna()
-            
+
             if bar_filtered_data.empty:
                 st.warning("No data available for the selected axes.")
             else:
-                # Rename columns for readability
                 bar_filtered_data.columns = ["X", "Y", "Weather"]
                 
-                # Create the bar chart
                 if stack_by_weather:
                     fig = px.bar(
                         bar_filtered_data,
@@ -421,8 +411,141 @@ if visualization_mode == "Dynamic Bar Chart":
                 st.plotly_chart(fig, use_container_width=True)
 
 elif visualization_mode == "Radar Plot":
-    st.markdown("### Radar Plot - *Coming Soon!*")
-    st.write("Radar Plot functionality is not yet implemented.")
+    ############################
+    # Radar Plot Implementation
+    # with a Better Balanced Normalization (log + min–max)
+    # and STATE-BASED interactivity
+    ############################
+
+    st.markdown("### Interactive Radar Plot (Balanced)")
+
+    # 1. If in State Details mode and a state is clicked, filter to that state.
+    if mode == "State Details" and clicked_data and clicked_data.get("last_clicked"):
+        lat = clicked_data["last_clicked"]["lat"]
+        lon = clicked_data["last_clicked"]["lng"]
+        wantedState = str(find_state(lat, lon))
+        radar_data = filtered_data[filtered_data['state_name'] == wantedState]
+    else:
+        # Otherwise, use all filtered data
+        radar_data = filtered_data.copy()
+
+    # Safety check for empty data
+    if radar_data.empty:
+        st.warning("No data available for the selected filters and/or clicked state to plot the Radar Chart.")
+    else:
+        # Columns of interest
+        attrs = {
+            "trnspd": "Average Speed (mph)",
+            "trkdmg": "Track Damage ($)",
+            "caskld": "Deaths",
+            "casinj": "Injuries",
+            "eqpdmg": "Equipment Damage ($)"
+        }
+
+        # This dict will hold the final single radar value (0–1) for each attribute.
+        normalized_values = {}
+
+        import numpy as np
+
+        # 2. For each attribute, compute a "balanced" average on a log+min–max scale
+        for col in attrs.keys():
+            # Extract column data, drop NaNs
+            col_data = radar_data[col].dropna()
+            if col_data.empty:
+                normalized_values[col] = 0.0
+                continue
+
+            # Shift so smallest value is ≥ 1 for log transform
+            min_val_raw = col_data.min()
+            shift_amount = 1 - min_val_raw if min_val_raw < 1 else 0
+            col_data_shifted = col_data + shift_amount
+
+            # Log transform
+            col_data_log = np.log(col_data_shifted)
+
+            # Min–max on the logged data
+            col_log_min = col_data_log.min()
+            col_log_max = col_data_log.max()
+            if col_log_min == col_log_max:
+                col_data_norm = [0.0] * len(col_data_log)
+            else:
+                col_data_norm = (col_data_log - col_log_min) / (col_log_max - col_log_min)
+
+            # Final single value = mean of normalized distribution
+            col_norm_mean = np.mean(col_data_norm)
+            normalized_values[col] = col_norm_mean
+
+        # 3. Prepare categories & single normalized value for each attribute
+        radar_categories = list(attrs.values())
+        radar_values = [normalized_values[col] for col in attrs.keys()]
+
+        # 4. Create radar chart with Plotly's go.Scatterpolar
+        fig = go.Figure()
+        fig.add_trace(go.Scatterpolar(
+            r=radar_values,
+            theta=radar_categories,
+            fill='toself',
+            fillcolor='rgba(0, 180, 255, 0.3)',
+            line_color='rgba(0, 180, 255, 1)',
+            marker=dict(symbol='circle', size=6, color='rgba(0, 180, 255, 1)'),
+            hovertemplate="<b>%{theta}</b>: %{r:.2f}<extra></extra>"
+        ))
+
+        # 5. Style the Radar Plot (Dark Polygon Style)
+        fig.update_layout(
+            polar=dict(
+                bgcolor='#1E1E1E',
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 1],
+                    showline=True,
+                    linewidth=2,
+                    linecolor='rgba(255,255,255,0.2)',
+                    showgrid=True,
+                    gridcolor='rgba(255,255,255,0.2)',
+                    gridwidth=1,
+                    tickfont=dict(color='#FFFFFF'),
+                    tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0]
+                ),
+                angularaxis=dict(
+                    visible=True,
+                    showline=True,
+                    linewidth=1,
+                    linecolor='rgba(255,255,255,0.2)',
+                    showgrid=True,
+                    gridcolor='rgba(255,255,255,0.2)',
+                    tickfont=dict(color='#FFFFFF'),
+                    rotation=90,
+                ),
+            ),
+            paper_bgcolor='#1E1E1E',
+            plot_bgcolor='#1E1E1E',
+            font=dict(color='#FFFFFF'),
+            showlegend=False,
+            margin=dict(l=60, r=60, t=120, b=60),
+        )
+
+        # Title in range [0,1] for 'y'
+        chart_title = "<b>Balanced Radar Plot</b>"
+        if mode == "State Details" and not radar_data.empty:
+            # Optionally show the state name in the title if you like
+            state_name = radar_data['state_name'].iloc[0]
+            chart_title += f"<br>{state_name}"
+
+        fig.update_layout(
+            title=dict(
+                text=chart_title,
+                x=0.5,
+                y=0.95,
+                xanchor='center',
+                yanchor='top',
+                font=dict(size=18)
+            )
+        )
+
+        # 6. Display the chart
+        st.plotly_chart(fig, use_container_width=True)
+
 
 elif visualization_mode == "Line Chart":
     st.markdown("### Line Chart - *Coming Soon!*")
@@ -432,36 +555,41 @@ elif visualization_mode == "Line Chart":
 # Add Help Dropdown Menu
 ################################################################################
 with st.expander("ℹ️ Help: How to Use the Railroad Incident Map"):
-    st.markdown("""
-    ### How to Use the Railroad Incident Map
+    st.markdown(
+        """
+        ### How to Use the Railroad Incident Map
 
-    - **Visualization Mode:** Choose the type of visualization you want to see. Currently, only the **Dynamic Bar Chart** is available.
-    
-    - **Select Mode:** 
-        - **Incident Details:** View individual incidents on the map. Click on markers to see detailed information in the sidebar.
-        - **State Details:** View aggregated data for specific states. Click on state markers to see detailed statistics in the sidebar.
-    
-    - **Dynamic Filters:** Use the filters to narrow down the incidents based on speed, weather, year, death, injury, and damage categories.
-    
-    - **Enable Clustering:** Toggle clustering to group nearby incident markers for better map readability.
-    
-    - **Show Heatmap:** Display a heatmap overlay to visualize areas with high incident concentrations.
-    
-    - **Dynamic Bar Chart:** When selected, customize the bar chart by choosing different X and Y axes and optionally stacking by weather conditions.
-    
-    - **Theme Toggle:** Switch between dark and light themes for better visual comfort.
-    
-    ### Interactions:
-    - **Map Click:**
-        - **Incident Details Mode:** Click on an incident marker to view its details in the sidebar under "Incident Details".
-        - **State Details Mode:** Click on a state marker to view its details in the sidebar under "State Details".
-    
-    - **Sidebar Controls:** All filters and visualization options are available in the sidebar for easy access.
-    
-    ### Future Enhancements:
-    - **Radar Plot:** Compare multiple variables in a single visualization.
-    - **Line Chart:** Track trends over time.
-    """)
+        - **Visualization Mode:** Choose the type of visualization you want to see. 
+          - **Dynamic Bar Chart** is currently the primary fully functional example.
+          - **Radar Plot** shows a polygon-style spider chart.
+          - **Line Chart** is a placeholder for future development.
+        
+        - **Select Mode:** 
+            - **Incident Details:** View individual incidents on the map. 
+              Click on markers to see details in the sidebar.
+            - **State Details:** View aggregated data for specific states. 
+              Click on state markers to see stats in the sidebar.
+        
+        - **Dynamic Filters:** Use the filters to narrow down the incidents based on speed, 
+          weather, year, death, injury, and damage categories.
+        
+        - **Enable Clustering:** Toggle clustering to group nearby markers for easier viewing.
+        
+        - **Show Heatmap:** Overlay a heatmap of the incidents.
+        
+        - **Dynamic Bar Chart:** Customize the axes, stack by weather, and filter by weather.
+        
+        - **Radar Plot:** Displays the average Speed, Track Damage, Death, Injury, and Equipment 
+          Damage in a dark “spiderweb” style plot.
+        
+        - **Theme Toggle:** Switch between dark and light themes.
+
+        ### Future Enhancements:
+        - **Radar Plot:** Additional styling or multiple traces for comparison.
+        - **Line Chart:** Time-based trending.
+        - **More robust** mapping and data breakdown for states vs. counties.
+        """
+    )
 
 ################################################################################
 #Instructions to run the app
